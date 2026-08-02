@@ -1,0 +1,4 @@
+interface:
+  display_name: "韭菜助手"
+  short_description: "用贝叶斯筛选投资标的，并以泊松过程管理持有、巡检与复盘"
+  default_prompt: "使用 $jiucai-helper。若尚未初始化，先逐步确认本地目录，检查 Python 与免费行情依赖，再询问是否配置 Futu；返回可免登录阅读的方法论飞书分享链接。完成后先打开预设的「模拟账号」观测台，再列出个人账户初始化与两条主指令。"

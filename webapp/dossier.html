@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>标的档案</title>
+<style>
+:root{--bg:#f7f8fa;--card:#fff;--line:#e6e8ec;--ink:#1a1d21;--muted:#697079;--dim:#9aa1a9;
+  --accent:#0b5bab;--up:#d92d20;--down:#188554;--amber:#b7791f;
+  --mono:"SF Mono","Menlo",monospace;--body:"PingFang SC","Hiragino Sans GB",-apple-system,sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:var(--bg)}
+body{font-family:var(--body);color:var(--ink);line-height:1.9}
+.wrap{max-width:880px;margin:0 auto;padding:30px 22px 90px}
+.back{font-size:13px;color:var(--accent);text-decoration:none;font-weight:600}
+h1.title{font-size:24px;font-weight:700;margin:18px 0 10px}
+.metachips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:26px}
+.mchip{font-size:11.5px;color:var(--muted);background:#f1f2f4;border-radius:8px;padding:4px 11px}
+.mchip b{color:var(--ink);font-family:var(--mono);font-weight:600}
+article{background:var(--card);border-radius:18px;padding:34px 38px;
+  box-shadow:0 1px 3px rgba(23,26,31,.05),0 8px 24px rgba(23,26,31,.04)}
+article h2{font-size:17px;font-weight:700;margin:30px 0 12px;padding-top:18px;border-top:1px solid #f0f1f3}
+article h2:first-child{margin-top:0;border-top:none;padding-top:0}
+article h3{font-size:14.5px;font-weight:700;margin:20px 0 8px}
+article p{font-size:13.5px;color:#3c4247;margin:10px 0}
+article blockquote{border-left:3px solid var(--line);padding:8px 16px;margin:14px 0;
+  background:#fafbfc;border-radius:0 10px 10px 0;font-size:12.5px;color:var(--muted)}
+article blockquote p{margin:4px 0;color:var(--muted);font-size:12.5px}
+article ul{margin:10px 0 10px 22px}
+article li{font-size:13.5px;color:#3c4247;margin:5px 0}
+article hr{border:none;border-top:1px solid var(--line);margin:26px 0}
+article a{color:var(--accent);text-decoration:none}
+article a:hover{text-decoration:underline}
+article code{font-family:var(--mono);font-size:12px;background:#f1f2f4;border-radius:5px;padding:1px 6px}
+.tbox{overflow-x:auto;margin:14px 0;border:1px solid #f0f1f3;border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px}
+th{color:var(--dim);font-weight:500;text-align:left;padding:10px 12px;white-space:nowrap;
+  border-bottom:1px solid var(--line);background:#fafbfc}
+td{padding:11px 12px;border-bottom:1px solid #f4f5f7;color:#3c4247;line-height:1.8;vertical-align:top}
+tr:last-child td{border-bottom:none}
+#err{color:var(--up);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← 返回观测台</a>
+  <h1 class="title" id="ttl">加载中…</h1>
+  <div class="metachips" id="chips"></div>
+  <article id="doc"><p id="err"></p></article>
+</div>
+<script>
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const inline=t=>esc(t)
+  .replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>")
+  .replace(/`([^`]+)`/g,"<code>$1</code>")
+  .replace(/\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
+  .replace(/\[\[([^\]]+)\]\]/g,"<i>$1</i>");
+
+function mdToHtml(md){
+  let fm={};
+  if(md.startsWith("---\n")){
+    const e=md.indexOf("\n---\n",4);
+    if(e>0){md.slice(4,e).split("\n").forEach(l=>{
+      const m=l.match(/^(\w+):\s*(.+)$/);if(m)fm[m[1]]=m[2].trim();});
+      md=md.slice(e+5);}
+  }
+  const lines=md.split("\n");
+  let out=[],tbl=null,ul=false,para=[];
+  const flushP=()=>{if(para.length){out.push("<p>"+inline(para.join("\n")).replace(/\n/g,"<br>")+"</p>");para=[];}};
+  const flushT=()=>{if(tbl){
+    let h="<div class='tbox'><table>";
+    tbl.forEach((cells,i)=>{
+      const tag=i===0?"th":"td";
+      h+="<tr>"+cells.map(c=>`<${tag}>${inline(c)}</${tag}>`).join("")+"</tr>";});
+    h+="</table></div>";out.push(h);tbl=null;}};
+  const flushU=()=>{if(ul){out.push("</ul>");ul=false;}};
+  for(let raw of lines){
+    const ln=raw.trimEnd();
+    if(/^\|/.test(ln.trim())){
+      flushP();flushU();
+      const cells=ln.trim().replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
+      if(cells.every(c=>/^:?-{2,}:?$/.test(c)||c===""))continue;
+      if(!tbl)tbl=[];
+      tbl.push(cells);continue;
+    }
+    flushT();
+    if(ln.trim()===""){flushP();flushU();continue;}
+    let m;
+    if(m=ln.match(/^#{1,2}\s+(.*)/)){flushP();flushU();out.push("<h2>"+inline(m[1])+"</h2>");continue;}
+    if(m=ln.match(/^#{3,6}\s+(.*)/)){flushP();flushU();out.push("<h3>"+inline(m[1])+"</h3>");continue;}
+    if(/^(-{3,}|\*{3,})$/.test(ln.trim())){flushP();flushU();out.push("<hr>");continue;}
+    if(m=ln.match(/^>\s?(.*)/)){flushP();flushU();out.push("<blockquote><p>"+inline(m[1])+"</p></blockquote>");continue;}
+    if(m=ln.match(/^[-*]\s+(.*)/)){flushP();if(!ul){out.push("<ul>");ul=true;}out.push("<li>"+inline(m[1])+"</li>");continue;}
+    para.push(ln);
+  }
+  flushP();flushT();flushU();
+  return {fm,html:out.join("\n")};
+}
+
+(async()=>{
+  const p=new URLSearchParams(location.search);
+  const file=p.get("file"),acc=p.get("account")||"main";
+  try{
+    const r=await fetch(`/api/dossier?file=${encodeURIComponent(file)}&account=${encodeURIComponent(acc)}`);
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    const {fm,html}=mdToHtml(d.md);
+    document.title=(fm.name||d.file)+" · 标的档案";
+    document.querySelector("#ttl").textContent=(fm.name||"")+"（"+(fm.ticker||d.file)+"）· 完整档案";
+    const keys=[["status","状态"],["posterior","后验"],["lambda_event","λ"],["prior","先验"],
+                ["next_review","下次检验"],["last_update","更新"],["horizon","口径"]];
+    document.querySelector("#chips").innerHTML=keys
+      .filter(([k])=>fm[k]).map(([k,lab])=>`<span class="mchip">${lab} <b>${esc(fm[k])}</b></span>`).join("");
+    document.querySelector("#doc").innerHTML=html;
+  }catch(e){
+    document.querySelector("#ttl").textContent="档案加载失败";
+    document.querySelector("#err").textContent=String(e);
+  }
+})();
+</script>
+</body>
+</html>
